@@ -556,6 +556,12 @@ const server = http.createServer(async (req, res) => {
   const pathname =
     requestUrl.pathname === "/"
       ? "/index.html"
+      : requestUrl.pathname === "/direct"
+        ? "/index.html"
+        : requestUrl.pathname === "/folders"
+          ? "/index.html"
+          : requestUrl.pathname === "/gallery"
+            ? "/index.html"
       : requestUrl.pathname === "/remote"
         ? "/remote.html"
         : requestUrl.pathname;

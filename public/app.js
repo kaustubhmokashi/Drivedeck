@@ -82,6 +82,12 @@ let slideshowConfig = {
   loop: false,
   autoplay: false,
 };
+const screenRoutes = {
+  1: "/",
+  2: "/direct",
+  3: "/folders",
+  4: "/gallery",
+};
 
 function focusElement(element) {
   if (!element) {
@@ -369,7 +375,34 @@ function setSlideshowChromeVisible(isVisible) {
   scheduleSlideshowChromeHide();
 }
 
-function setActiveScreen(step) {
+function getStepForPath(pathname) {
+  if (pathname === "/direct") {
+    return 2;
+  }
+
+  if (pathname === "/folders") {
+    return currentFolders.length ? 3 : 1;
+  }
+
+  if (pathname === "/gallery") {
+    return currentFolders.length ? 4 : 1;
+  }
+
+  return 1;
+}
+
+function syncHistoryForStep(step, replaceState = false) {
+  const nextPath = screenRoutes[step] || "/";
+  if (window.location.pathname === nextPath) {
+    return;
+  }
+
+  const method = replaceState ? "replaceState" : "pushState";
+  window.history[method]({ step }, "", nextPath);
+}
+
+function setActiveScreen(step, options = {}) {
+  const { replaceState = false, skipHistory = false } = options;
   screenLink.classList.toggle("active", step === 1);
   screenDirectLink.classList.toggle("active", step === 2);
   screenFolders.classList.toggle("active", step === 3);
@@ -377,6 +410,10 @@ function setActiveScreen(step) {
 
   if (step !== 3) {
     screenFolders.classList.remove("panel-open");
+  }
+
+  if (!skipHistory) {
+    syncHistoryForStep(step, replaceState);
   }
 
   if (step === 1) {
@@ -1004,4 +1041,11 @@ slideshowEl.addEventListener("click", (event) => {
 
 updateDurationControls();
 setupRemotePairingLink();
-focusElement(pairingCodeInput);
+setActiveScreen(getStepForPath(window.location.pathname), { replaceState: true });
+
+window.addEventListener("popstate", () => {
+  setActiveScreen(getStepForPath(window.location.pathname), {
+    skipHistory: true,
+    replaceState: true,
+  });
+});

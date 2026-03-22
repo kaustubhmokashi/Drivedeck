@@ -832,7 +832,7 @@ input[type="checkbox"]:checked {
     padding: 18px;
   }
 
-  .screen-link {
+  .screen-link.active {
     display: grid;
     min-height: 100vh;
     grid-template-rows: auto 1fr auto;
@@ -933,7 +933,7 @@ input[type="checkbox"]:checked {
     padding: 16px 18px;
   }
 
-  .screen-link {
+  .screen-link.active {
     display: grid;
     min-height: 100vh;
     grid-template-rows: auto 1fr auto;
