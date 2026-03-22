@@ -1,0 +1,9 @@
+{
+  "name": "drivedeck",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DriveDeck TV slideshow app for public Google Drive folders",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
