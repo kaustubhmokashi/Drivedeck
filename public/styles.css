@@ -703,7 +703,8 @@ input[type="checkbox"]:checked {
 .slideshow-controls-hidden .slideshow-head,
 .slideshow-controls-hidden .slide-caption,
 .slideshow-controls-hidden .slide-counter-block,
-.slideshow-controls-hidden .slide-dock {
+.slideshow-controls-hidden .slide-dock,
+.slideshow-controls-hidden .slideshow-settings {
   opacity: 0;
   pointer-events: none;
 }
@@ -714,7 +715,8 @@ input[type="checkbox"]:checked {
 }
 
 .slideshow-controls-hidden .slide-counter-block,
-.slideshow-controls-hidden .slide-dock {
+.slideshow-controls-hidden .slide-dock,
+.slideshow-controls-hidden .slideshow-settings {
   transform: translateY(16px);
 }
 
