@@ -59,6 +59,10 @@ function generateRemoteCode() {
   return code;
 }
 
+function normalizeRemoteUrl(url) {
+  return String(url || "").trim();
+}
+
 function isExpired(createdAt) {
   const timestamp = Date.parse(createdAt || "");
   if (Number.isNaN(timestamp)) {
@@ -448,7 +452,7 @@ async function handleApiFolderMeta(req, res) {
 async function handleSaveRemoteLink(req, res) {
   try {
     const body = await readRequestBody(req);
-    const url = String(body.url || "").trim();
+    const url = normalizeRemoteUrl(body.url);
 
     if (!url) {
       sendJson(res, 400, { error: "A Google Drive URL is required." });
@@ -456,6 +460,13 @@ async function handleSaveRemoteLink(req, res) {
     }
 
     const mappings = pruneExpiredMappings();
+    const existingEntry = mappings.find((entry) => normalizeRemoteUrl(entry.url) === url);
+
+    if (existingEntry) {
+      sendJson(res, 200, { success: true, code: existingEntry.code, reused: true });
+      return;
+    }
+
     const code = generateRemoteCode();
     mappings.push({
       code,
