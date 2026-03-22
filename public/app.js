@@ -72,6 +72,7 @@ let imageLoadFailures = 0;
 let autoplayTimer = null;
 let loadTimer = null;
 let loadStartedAt = 0;
+let slideshowChromeVisible = false;
 let slideshowConfig = {
   duration: 8,
   loop: false,
@@ -321,6 +322,14 @@ function setLoadingState(isLoading, message = "", options = {}) {
   loadTimer = window.setInterval(() => {
     copyEl.textContent = formatElapsedCopy(baseMessage);
   }, 1000);
+}
+
+function setSlideshowChromeVisible(isVisible) {
+  slideshowChromeVisible = isVisible;
+  slideshowEl.classList.toggle("slideshow-controls-hidden", !isVisible);
+  if (!isVisible) {
+    slideshowSettingsEl.classList.add("hidden");
+  }
 }
 
 function setActiveScreen(step) {
@@ -590,15 +599,15 @@ function openSlideshow(index = 0) {
   showSlide(index);
   slideshowEl.classList.remove("hidden");
   slideshowEl.setAttribute("aria-hidden", "false");
+  setSlideshowChromeVisible(false);
   updateDurationControls();
   startAutoplay();
-  focusElement(playPauseButton);
 }
 
 function closeSlideshow() {
   slideshowEl.classList.add("hidden");
   slideshowEl.setAttribute("aria-hidden", "true");
-  slideshowSettingsEl.classList.add("hidden");
+  setSlideshowChromeVisible(false);
   clearAutoplay();
   focusElement(galleryEl.querySelector(".photo-card") || startSlideshowButton);
 }
@@ -615,7 +624,11 @@ function handleKeydown(event) {
       event.preventDefault();
       if (!slideshowSettingsEl.classList.contains("hidden")) {
         slideshowSettingsEl.classList.add("hidden");
+        setSlideshowChromeVisible(true);
         focusElement(closeSlideshowButton);
+      } else if (!slideshowChromeVisible) {
+        setSlideshowChromeVisible(true);
+        focusElement(playPauseButton);
       } else {
         closeSlideshow();
       }
@@ -646,6 +659,13 @@ function handleKeydown(event) {
   }
 
   if (slideshowEl.classList.contains("hidden")) {
+    return;
+  }
+
+  if (!slideshowChromeVisible && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+    event.preventDefault();
+    setSlideshowChromeVisible(true);
+    focusElement(playPauseButton);
     return;
   }
 
@@ -878,6 +898,7 @@ playPauseButton.addEventListener("click", () => {
 });
 
 toggleSettingsButton.addEventListener("click", () => {
+  setSlideshowChromeVisible(true);
   slideshowSettingsEl.classList.toggle("hidden");
   focusElement(
     slideshowSettingsEl.classList.contains("hidden")
@@ -887,6 +908,7 @@ toggleSettingsButton.addEventListener("click", () => {
 });
 
 dockSettingsButton.addEventListener("click", () => {
+  setSlideshowChromeVisible(true);
   slideshowSettingsEl.classList.toggle("hidden");
   focusElement(
     slideshowSettingsEl.classList.contains("hidden")
@@ -903,8 +925,12 @@ closeSlideshowSettingsButton.addEventListener("click", () => {
 document.addEventListener("keydown", handleKeydown);
 
 slideshowEl.addEventListener("click", (event) => {
-  if (event.target === slideshowEl) {
-    closeSlideshow();
+  if (
+    event.target === slideshowEl ||
+    event.target === slideImageEl ||
+    event.target.classList.contains("slideshow-frame")
+  ) {
+    setSlideshowChromeVisible(true);
   }
 });
 
