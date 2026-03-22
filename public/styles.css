@@ -300,6 +300,22 @@ label:focus-within {
   grid-template-columns: minmax(0, 1fr) 320px;
 }
 
+.folders-screen.active {
+  grid-template-columns: 1fr;
+}
+
+.folders-screen .workspace-side {
+  display: none;
+}
+
+.folders-screen.panel-open.active {
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+.folders-screen.panel-open .workspace-side {
+  display: block;
+}
+
 .workspace-main {
   position: relative;
   min-height: 100vh;
@@ -342,8 +358,9 @@ label:focus-within {
 
 .folder-sequence {
   display: grid;
-  gap: 14px;
-  max-width: 780px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  max-width: 1080px;
   max-height: calc(100vh - 320px);
   overflow-y: auto;
   padding-right: 10px;
@@ -359,6 +376,7 @@ label:focus-within {
 
 .folder-choice {
   width: 100%;
+  min-height: 170px;
   padding: 20px 22px;
   border: 1px solid transparent;
   border-left: 1px solid var(--line);
@@ -372,7 +390,7 @@ label:focus-within {
 .folder-choice.selected {
   background: var(--surface-high);
   border-color: rgba(229, 57, 53, 0.4);
-  transform: translateX(6px);
+  transform: translateY(-4px);
 }
 
 .folder-choice-title {
@@ -383,6 +401,14 @@ label:focus-within {
   margin-bottom: 10px;
   font-family: "Space Grotesk", sans-serif;
   font-size: 1.05rem;
+  flex-direction: column;
+}
+
+.folder-choice-title span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .folder-choice-path {
@@ -776,6 +802,10 @@ input[type="checkbox"]:checked {
     grid-template-columns: 1fr;
   }
 
+  .folders-screen.panel-open.active {
+    grid-template-columns: 1fr;
+  }
+
   .workspace-stage {
     min-height: auto;
     padding: 96px 28px 56px;
@@ -855,6 +885,10 @@ input[type="checkbox"]:checked {
   .gallery-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 12px;
+  }
+
+  .folder-sequence {
+    grid-template-columns: 1fr;
   }
 
   .slide-caption {

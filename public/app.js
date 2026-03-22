@@ -26,6 +26,9 @@ const folderCountEl = document.getElementById("folder-count");
 const folderPathStatusEl = document.getElementById("folder-path-status");
 const foldersTitleEl = document.getElementById("folders-title");
 const foldersSubtitleEl = document.getElementById("folders-subtitle");
+const toggleFolderPanelButton = document.getElementById("toggle-folder-panel");
+const closeFolderPanelButton = document.getElementById("close-folder-panel");
+const folderSidePanelEl = document.getElementById("folder-side-panel");
 const selectedFolderNameEl = document.getElementById("selected-folder-name");
 const selectedFolderPathEl = document.getElementById("selected-folder-path");
 const selectedFolderCountEl = document.getElementById("selected-folder-count");
@@ -105,38 +108,33 @@ function moveFolderFocus(direction) {
   focusElement(buttons[nextIndex]);
 }
 
-function getGalleryCards() {
-  return Array.from(galleryEl.querySelectorAll(".photo-card"));
-}
-
-function moveGalleryFocus(direction) {
-  const cards = getGalleryCards();
-  if (!cards.length) {
+function moveFocusByGeometry(elements, direction) {
+  if (!elements.length) {
     return;
   }
 
-  const currentIndex = cards.findIndex((card) => card === document.activeElement);
+  const currentIndex = elements.findIndex((element) => element === document.activeElement);
   const safeIndex = currentIndex === -1 ? 0 : currentIndex;
 
   if (direction === "left" || direction === "right") {
     const delta = direction === "left" ? -1 : 1;
-    const nextIndex = Math.max(0, Math.min(cards.length - 1, safeIndex + delta));
-    focusElement(cards[nextIndex]);
+    const nextIndex = Math.max(0, Math.min(elements.length - 1, safeIndex + delta));
+    focusElement(elements[nextIndex]);
     return;
   }
 
-  const currentRect = cards[safeIndex].getBoundingClientRect();
+  const currentRect = elements[safeIndex].getBoundingClientRect();
   const currentCenterX = currentRect.left + currentRect.width / 2;
   const movingDown = direction === "down";
-  let bestCard = null;
+  let bestElement = null;
   let bestScore = Number.POSITIVE_INFINITY;
 
-  cards.forEach((card, index) => {
+  elements.forEach((element, index) => {
     if (index === safeIndex) {
       return;
     }
 
-    const rect = card.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
     const isCandidate = movingDown ? rect.top > currentRect.top + 12 : rect.top < currentRect.top - 12;
     if (!isCandidate) {
       return;
@@ -149,13 +147,29 @@ function moveGalleryFocus(direction) {
 
     if (score < bestScore) {
       bestScore = score;
-      bestCard = card;
+      bestElement = element;
     }
   });
 
-  if (bestCard) {
-    focusElement(bestCard);
+  if (bestElement) {
+    focusElement(bestElement);
   }
+}
+
+function getFolderCards() {
+  return Array.from(folderTreeEl.querySelectorAll(".folder-choice"));
+}
+
+function moveFolderGridFocus(direction) {
+  moveFocusByGeometry(getFolderCards(), direction);
+}
+
+function getGalleryCards() {
+  return Array.from(galleryEl.querySelectorAll(".photo-card"));
+}
+
+function moveGalleryFocus(direction) {
+  moveFocusByGeometry(getGalleryCards(), direction);
 }
 
 function getSlideshowPrimaryControls() {
@@ -361,6 +375,10 @@ function setActiveScreen(step) {
   screenFolders.classList.toggle("active", step === 3);
   screenGallery.classList.toggle("active", step === 4);
 
+  if (step !== 3) {
+    screenFolders.classList.remove("panel-open");
+  }
+
   if (step === 1) {
     focusElement(pairingCodeInput);
   } else if (step === 2) {
@@ -447,14 +465,16 @@ function renderFolderChoices(folders) {
     button.addEventListener("keydown", (event) => {
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        moveFolderFocus(1);
+        moveFolderGridFocus("down");
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
-        moveFolderFocus(-1);
+        moveFolderGridFocus("up");
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        moveFolderGridFocus("left");
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
-        updateGalleryForSelectedFolder();
-        setActiveScreen(4);
+        moveFolderGridFocus("right");
       } else if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         selectedFolderId = folder.id;
@@ -854,6 +874,16 @@ directLinkForm.addEventListener("submit", async (event) => {
 openDirectLinkButton.addEventListener("click", () => {
   setDirectStatus("");
   setActiveScreen(2);
+});
+
+toggleFolderPanelButton.addEventListener("click", () => {
+  screenFolders.classList.add("panel-open");
+  focusElement(closeFolderPanelButton || continueToGalleryButton);
+});
+
+closeFolderPanelButton.addEventListener("click", () => {
+  screenFolders.classList.remove("panel-open");
+  focusElement(folderTreeEl.querySelector(".folder-choice"));
 });
 
 backToPairingButton.addEventListener("click", () => setActiveScreen(1));

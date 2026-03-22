@@ -113,11 +113,12 @@
         </div>
       </section>
 
-      <section id="screen-folders" class="screen workspace-screen">
+      <section id="screen-folders" class="screen workspace-screen folders-screen">
         <div class="workspace-main">
           <div class="screen-hud hud-top">
             <div class="brand-lockup">DRIVEDECK</div>
             <div class="hud-actions">
+              <button id="toggle-folder-panel" type="button" class="icon-action" aria-label="Open folder details">⚙</button>
               <button id="back-to-link" type="button" class="icon-action">←</button>
             </div>
           </div>
@@ -148,8 +149,13 @@
           </div>
         </div>
 
-        <aside class="workspace-side">
+        <aside id="folder-side-panel" class="workspace-side">
           <div class="side-panel">
+            <div class="slideshow-settings-head">
+              <button id="close-folder-panel" type="button" class="icon-action icon-action-close-panel" aria-label="Close folder details">
+                Close
+              </button>
+            </div>
             <p class="side-title">DRIVEDECK</p>
             <p class="side-subtitle">FOLDER PICKER</p>
 
