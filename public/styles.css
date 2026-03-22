@@ -308,6 +308,24 @@ label:focus-within {
   display: none;
 }
 
+.folders-screen .workspace-main {
+  min-height: auto;
+}
+
+.folders-screen .screen-hud {
+  position: static;
+}
+
+.folders-screen .hud-top,
+.folders-screen .hud-bottom {
+  padding: 18px 24px;
+}
+
+.folders-screen .workspace-stage {
+  min-height: auto;
+  padding: 28px 24px 36px;
+}
+
 .folders-screen.panel-open.active {
   grid-template-columns: minmax(0, 1fr) 320px;
 }
@@ -360,10 +378,11 @@ label:focus-within {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
-  max-width: 1080px;
-  max-height: calc(100vh - 320px);
-  overflow-y: auto;
-  padding-right: 10px;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .folder-sequence::-webkit-scrollbar {
