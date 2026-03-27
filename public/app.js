@@ -44,8 +44,10 @@ const continueToGalleryButton = document.getElementById("continue-to-gallery");
 const backToFoldersButton = document.getElementById("back-to-folders");
 const startSlideshowButton = document.getElementById("start-slideshow");
 
-const durationInput = document.getElementById("duration-input");
 const durationReadoutEl = document.getElementById("duration-readout");
+const durationCountEl = document.getElementById("duration-count");
+const durationDecreaseButton = document.getElementById("duration-decrease");
+const durationIncreaseButton = document.getElementById("duration-increase");
 const loopInput = document.getElementById("loop-input");
 const autoplayInput = document.getElementById("autoplay-input");
 
@@ -62,8 +64,10 @@ const toggleSettingsButton = document.getElementById("toggle-settings");
 const dockSettingsButton = document.getElementById("dock-settings");
 const slideshowSettingsEl = document.getElementById("slideshow-settings");
 const closeSlideshowSettingsButton = document.getElementById("close-slideshow-settings");
-const slideDurationInput = document.getElementById("slide-duration-input");
 const slideDurationReadoutEl = document.getElementById("slide-duration-readout");
+const slideDurationCountEl = document.getElementById("slide-duration-count");
+const slideDurationDecreaseButton = document.getElementById("slide-duration-decrease");
+const slideDurationIncreaseButton = document.getElementById("slide-duration-increase");
 const slideLoopInput = document.getElementById("slide-loop-input");
 const slideAutoplayInput = document.getElementById("slide-autoplay-input");
 
@@ -74,6 +78,7 @@ let currentSlideIndex = -1;
 let imageLoadFailures = 0;
 let autoplayTimer = null;
 let slideshowChromeHideTimer = null;
+let slideshowPreloadCache = new Map();
 let loadTimer = null;
 let loadStartedAt = 0;
 let slideshowChromeVisible = false;
@@ -600,8 +605,8 @@ function updateDurationControls() {
   const value = `${Number(slideshowConfig.duration).toFixed(1)}s`;
   durationReadoutEl.textContent = value;
   slideDurationReadoutEl.textContent = value;
-  durationInput.value = String(slideshowConfig.duration);
-  slideDurationInput.value = String(slideshowConfig.duration);
+  durationCountEl.textContent = `${Math.round(slideshowConfig.duration)}s`;
+  slideDurationCountEl.textContent = `${Math.round(slideshowConfig.duration)}s`;
   loopInput.checked = slideshowConfig.loop;
   slideLoopInput.checked = slideshowConfig.loop;
   autoplayInput.checked = slideshowConfig.autoplay;
@@ -641,12 +646,64 @@ function startAutoplay() {
 }
 
 function syncConfigFromInputs(source) {
-  const durationValue = Number(source.duration.value);
-  slideshowConfig.duration = durationValue;
   slideshowConfig.loop = source.loop.checked;
   slideshowConfig.autoplay = source.autoplay.checked;
   updateDurationControls();
   startAutoplay();
+}
+
+function changeDuration(delta) {
+  const nextValue = Math.max(2, Math.min(15, slideshowConfig.duration + delta));
+  slideshowConfig.duration = nextValue;
+  updateDurationControls();
+  startAutoplay();
+}
+
+function getWindowedSlideIndexes(centerIndex) {
+  if (!images.length) {
+    return [];
+  }
+
+  const indexes = new Set([centerIndex]);
+
+  for (let offset = 1; offset <= 2; offset += 1) {
+    if (slideshowConfig.loop) {
+      indexes.add((centerIndex - offset + images.length) % images.length);
+      indexes.add((centerIndex + offset) % images.length);
+      continue;
+    }
+
+    if (centerIndex - offset >= 0) {
+      indexes.add(centerIndex - offset);
+    }
+
+    if (centerIndex + offset < images.length) {
+      indexes.add(centerIndex + offset);
+    }
+  }
+
+  return Array.from(indexes);
+}
+
+function syncSlideshowPreloadWindow(centerIndex) {
+  const desiredIndexes = new Set(getWindowedSlideIndexes(centerIndex));
+
+  for (const [index] of slideshowPreloadCache.entries()) {
+    if (!desiredIndexes.has(index)) {
+      slideshowPreloadCache.delete(index);
+    }
+  }
+
+  desiredIndexes.forEach((index) => {
+    if (slideshowPreloadCache.has(index)) {
+      return;
+    }
+
+    const preloader = new Image();
+    preloader.decoding = "async";
+    preloader.src = images[index].url;
+    slideshowPreloadCache.set(index, preloader);
+  });
 }
 
 function showSlide(index) {
@@ -672,6 +729,7 @@ function showSlide(index) {
   slideTitleEl.textContent = photo.name.replace(/\.[^.]+$/, "").toUpperCase();
   slideMetaEl.textContent = `${(photo.path || "ROOT FOLDER").replaceAll("/", " // ").toUpperCase()} // FRAME_${String(currentSlideIndex + 1).padStart(3, "0")}`;
   slidePositionEl.textContent = String(currentSlideIndex + 1).padStart(3, "0");
+  syncSlideshowPreloadWindow(currentSlideIndex);
 }
 
 function openSlideshow(index = 0) {
@@ -695,6 +753,7 @@ function closeSlideshow() {
   setSlideshowChromeVisible(false);
   clearAutoplay();
   clearSlideshowChromeHideTimer();
+  slideshowPreloadCache.clear();
   focusElement(galleryEl.querySelector(".photo-card") || startSlideshowButton);
 }
 
@@ -943,17 +1002,11 @@ backToFoldersButton.addEventListener("click", () => {
 
 startSlideshowButton.addEventListener("click", () => openSlideshow(0));
 
-durationInput.addEventListener("input", () =>
-  syncConfigFromInputs({
-    duration: durationInput,
-    loop: loopInput,
-    autoplay: autoplayInput,
-  })
-);
+durationDecreaseButton.addEventListener("click", () => changeDuration(-1));
+durationIncreaseButton.addEventListener("click", () => changeDuration(1));
 
 loopInput.addEventListener("change", () =>
   syncConfigFromInputs({
-    duration: durationInput,
     loop: loopInput,
     autoplay: autoplayInput,
   })
@@ -961,23 +1014,16 @@ loopInput.addEventListener("change", () =>
 
 autoplayInput.addEventListener("change", () =>
   syncConfigFromInputs({
-    duration: durationInput,
     loop: loopInput,
     autoplay: autoplayInput,
   })
 );
 
-slideDurationInput.addEventListener("input", () =>
-  syncConfigFromInputs({
-    duration: slideDurationInput,
-    loop: slideLoopInput,
-    autoplay: slideAutoplayInput,
-  })
-);
+slideDurationDecreaseButton.addEventListener("click", () => changeDuration(-1));
+slideDurationIncreaseButton.addEventListener("click", () => changeDuration(1));
 
 slideLoopInput.addEventListener("change", () =>
   syncConfigFromInputs({
-    duration: slideDurationInput,
     loop: slideLoopInput,
     autoplay: slideAutoplayInput,
   })
@@ -985,7 +1031,6 @@ slideLoopInput.addEventListener("change", () =>
 
 slideAutoplayInput.addEventListener("change", () =>
   syncConfigFromInputs({
-    duration: slideDurationInput,
     loop: slideLoopInput,
     autoplay: slideAutoplayInput,
   })

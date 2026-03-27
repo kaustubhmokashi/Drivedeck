@@ -231,7 +231,11 @@
                 <span class="side-key">Duration</span>
                 <span id="duration-readout" class="side-value">8.0s</span>
               </div>
-              <input id="duration-input" type="range" min="2" max="15" step="1" value="8" />
+              <div class="counter-control">
+                <button id="duration-decrease" type="button" class="counter-button" aria-label="Decrease duration">-</button>
+                <div id="duration-count" class="counter-value" aria-live="polite">8s</div>
+                <button id="duration-increase" type="button" class="counter-button" aria-label="Increase duration">+</button>
+              </div>
             </div>
 
             <label class="toggle-row">
@@ -300,7 +304,11 @@
               <span class="side-key">Interval duration</span>
               <span id="slide-duration-readout" class="side-value">8.0s</span>
             </div>
-            <input id="slide-duration-input" type="range" min="2" max="15" step="1" value="8" />
+            <div class="counter-control">
+              <button id="slide-duration-decrease" type="button" class="counter-button" aria-label="Decrease interval duration">-</button>
+              <div id="slide-duration-count" class="counter-value" aria-live="polite">8s</div>
+              <button id="slide-duration-increase" type="button" class="counter-button" aria-label="Increase interval duration">+</button>
+            </div>
           </div>
 
           <label class="toggle-row">
