@@ -4,6 +4,19 @@ const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 
+let initializeFirebaseApp = null;
+let getFirebaseApps = null;
+let firebaseCert = null;
+let getFirebaseFirestore = null;
+
+try {
+  ({ initializeApp: initializeFirebaseApp, getApps: getFirebaseApps, cert: firebaseCert } =
+    require("firebase-admin/app"));
+  ({ getFirestore: getFirebaseFirestore } = require("firebase-admin/firestore"));
+} catch (error) {
+  // Firebase is optional during local setup until dependencies and credentials are provided.
+}
+
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
 const API_KEY =
@@ -12,9 +25,11 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const DATA_DIR = path.join(__dirname, "data");
 const REMOTE_CODES_FILE = path.join(DATA_DIR, "remote-links.txt");
 const CODE_EXPIRY_MS = 2 * 24 * 60 * 60 * 1000;
+const FIREBASE_COLLECTION = process.env.FIREBASE_PAIRING_COLLECTION || "pairingCodes";
 
 const IMAGE_MIME_PREFIX = "image/";
 const FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
+let firestoreDb = null;
 
 function ensureDataStore() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -59,8 +74,67 @@ function generateRemoteCode() {
   return code;
 }
 
+async function generateUniqueRemoteCode(codeExists) {
+  let code = "";
+
+  do {
+    code = String(Math.floor(100000 + Math.random() * 900000));
+  } while (await codeExists(code));
+
+  return code;
+}
+
 function normalizeRemoteUrl(url) {
   return String(url || "").trim();
+}
+
+function getFirebaseServiceAccount() {
+  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const base64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+
+  if (!json && !base64) {
+    return null;
+  }
+
+  const parsed = JSON.parse(
+    json || Buffer.from(base64, "base64").toString("utf8")
+  );
+
+  if (parsed.private_key) {
+    parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+  }
+
+  return parsed;
+}
+
+function getFirestoreDb() {
+  if (!initializeFirebaseApp || !getFirebaseFirestore) {
+    return null;
+  }
+
+  if (firestoreDb) {
+    return firestoreDb;
+  }
+
+  if (!getFirebaseApps().length) {
+    const serviceAccount = getFirebaseServiceAccount();
+
+    if (serviceAccount) {
+      initializeFirebaseApp({
+        credential: firebaseCert(serviceAccount),
+        projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID,
+      });
+    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      initializeFirebaseApp({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+      });
+    } else {
+      return null;
+    }
+  }
+
+  firestoreDb = getFirebaseFirestore();
+  return firestoreDb;
 }
 
 function isExpired(createdAt) {
@@ -80,6 +154,108 @@ function pruneExpiredMappings() {
   }
 
   return activeMappings;
+}
+
+async function writeRemoteLinkToStore(url) {
+  const normalizedUrl = normalizeRemoteUrl(url);
+  const db = getFirestoreDb();
+
+  if (!db) {
+    const mappings = pruneExpiredMappings();
+    const existingEntry = mappings.find((entry) => normalizeRemoteUrl(entry.url) === normalizedUrl);
+
+    if (existingEntry) {
+      return { success: true, code: existingEntry.code, reused: true, store: "file" };
+    }
+
+    const code = generateRemoteCode();
+    mappings.push({
+      code,
+      url: normalizedUrl,
+      createdAt: new Date().toISOString(),
+    });
+    writeRemoteMappings(mappings);
+    return { success: true, code, reused: false, store: "file" };
+  }
+
+  const collection = db.collection(FIREBASE_COLLECTION);
+  const duplicateSnapshot = await collection
+    .where("normalizedUrl", "==", normalizedUrl)
+    .limit(5)
+    .get();
+
+  let reusableEntry = null;
+  const expiredDocs = [];
+
+  duplicateSnapshot.forEach((doc) => {
+    const data = doc.data();
+    if (isExpired(data.createdAt)) {
+      expiredDocs.push(doc.ref.delete());
+      return;
+    }
+
+    if (!reusableEntry) {
+      reusableEntry = { code: doc.id, ...data };
+    }
+  });
+
+  if (expiredDocs.length) {
+    await Promise.all(expiredDocs);
+  }
+
+  if (reusableEntry) {
+    return { success: true, code: reusableEntry.code, reused: true, store: "firestore" };
+  }
+
+  const code = await generateUniqueRemoteCode(async (candidate) => {
+    const existingDoc = await collection.doc(candidate).get();
+    return existingDoc.exists;
+  });
+
+  const createdAt = new Date().toISOString();
+  await collection.doc(code).set({
+    url: normalizedUrl,
+    normalizedUrl,
+    createdAt,
+  });
+
+  return { success: true, code, reused: false, store: "firestore" };
+}
+
+async function resolveRemoteLinkFromStore(code) {
+  const db = getFirestoreDb();
+
+  if (!db) {
+    const entry = pruneExpiredMappings().find((item) => item.code === code);
+    if (!entry) {
+      return null;
+    }
+
+    return {
+      code: entry.code,
+      url: entry.url || "",
+      ready: Boolean(entry.url),
+      store: "file",
+    };
+  }
+
+  const doc = await db.collection(FIREBASE_COLLECTION).doc(code).get();
+  if (!doc.exists) {
+    return null;
+  }
+
+  const data = doc.data() || {};
+  if (isExpired(data.createdAt)) {
+    await doc.ref.delete();
+    return null;
+  }
+
+  return {
+    code: doc.id,
+    url: data.url || "",
+    ready: Boolean(data.url),
+    store: "firestore",
+  };
 }
 
 function readRequestBody(req) {
@@ -459,24 +635,10 @@ async function handleSaveRemoteLink(req, res) {
       return;
     }
 
-    const mappings = pruneExpiredMappings();
-    const existingEntry = mappings.find((entry) => normalizeRemoteUrl(entry.url) === url);
-
-    if (existingEntry) {
-      sendJson(res, 200, { success: true, code: existingEntry.code, reused: true });
-      return;
-    }
-
-    const code = generateRemoteCode();
-    mappings.push({
-      code,
-      url,
-      createdAt: new Date().toISOString(),
-    });
-    writeRemoteMappings(mappings);
-    sendJson(res, 200, { success: true, code });
+    const result = await writeRemoteLinkToStore(url);
+    sendJson(res, 200, result);
   } catch (error) {
-    sendJson(res, 400, { error: "Invalid request body." });
+    sendJson(res, 400, { error: error.message || "Invalid request body." });
   }
 }
 
@@ -489,7 +651,7 @@ async function handleResolveRemoteCode(req, res) {
     return;
   }
 
-  const entry = pruneExpiredMappings().find((item) => item.code === code);
+  const entry = await resolveRemoteLinkFromStore(code);
   if (!entry) {
     sendJson(res, 404, { error: "Code not found or it has expired. Generate a new code." });
     return;
