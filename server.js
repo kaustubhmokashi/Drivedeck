@@ -316,6 +316,7 @@ function sendJson(res, statusCode, payload) {
 async function proxyDriveImage(req, res) {
   const requestUrl = new URL(req.url, `http://${req.headers.host}`);
   const fileId = requestUrl.searchParams.get("id");
+  const mode = requestUrl.searchParams.get("mode") === "thumb" ? "thumb" : "full";
 
   if (!API_KEY) {
     sendJson(res, 500, {
@@ -331,12 +332,19 @@ async function proxyDriveImage(req, res) {
   }
 
   try {
-    const candidates = [
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${encodeURIComponent(API_KEY)}`,
-      `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w1600`,
-      `https://lh3.googleusercontent.com/d/${encodeURIComponent(fileId)}=w1600`,
-      `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`,
-    ];
+    const candidates =
+      mode === "thumb"
+        ? [
+            `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w480`,
+            `https://lh3.googleusercontent.com/d/${encodeURIComponent(fileId)}=w480`,
+            `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${encodeURIComponent(API_KEY)}`,
+          ]
+        : [
+            `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${encodeURIComponent(API_KEY)}`,
+            `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w1600`,
+            `https://lh3.googleusercontent.com/d/${encodeURIComponent(fileId)}=w1600`,
+            `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`,
+          ];
 
     let lastError = "Unable to fetch image from Google Drive.";
 
@@ -478,8 +486,13 @@ async function driveGetFile(fileId) {
   return response.json();
 }
 
-function createImageUrl(fileId) {
-  return `/api/image?id=${encodeURIComponent(fileId)}`;
+function createImageUrl(fileId, mode = "full") {
+  const url = new URL("/api/image", "http://localhost");
+  url.searchParams.set("id", fileId);
+  if (mode === "thumb") {
+    url.searchParams.set("mode", "thumb");
+  }
+  return `${url.pathname}${url.search}`;
 }
 
 async function readFolderTree(folderId, rootName = "Root Folder") {
@@ -529,8 +542,8 @@ async function readFolderTree(folderId, rootName = "Root Folder") {
           name: file.name,
           mimeType: file.mimeType,
           path: current.path || "",
-          url: createImageUrl(file.id),
-          thumbnailUrl: createImageUrl(file.id),
+          url: createImageUrl(file.id, "full"),
+          thumbnailUrl: createImageUrl(file.id, "thumb"),
           webViewLink: file.webViewLink || "",
         };
 
